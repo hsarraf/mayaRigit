@@ -1,0 +1,78 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//setBlendShapeProc_RT.mel///
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+source "makeSliderProc_RT.mel";
+deleteUI  makeSlidersWin_RT;
+
+if (`window -exists   setBlendShapeWin_RT`)
+  deleteUI 	setBlendShapeWin_RT;
+window -t "Set BlendShape"	   setBlendShapeWin_RT;
+columnLayout -adj 1;
+  text -l "First select the blendshape node,\nthen select the targets and the source respectively";
+  textFieldGrp -l "Slider Name" -adj 1 -cal 1 left	BSSliderNameTF_RT;
+  radioButtonGrp -l "Mode Fot Two Channel" -nrb 2 -la2 "1D Center" "2D Corner" -sl 1 -adj 1 -cal 1 left   BSTwoChnlModRB_RT; 
+  button -l "Create Slider" -c "setBlendShapeProc_RT( \"\", \"\", {}, \"\", 0 )";
+
+showWindow 	setBlendShapeWin_RT;
+
+
+global proc string 	  setBlendShapeProc_RT (string $BSNode, string $base, string $sources[], string $sliderName, int $sType) {
+
+  if ($BSNode == "") {	// check if it is called from GUI
+	string $selectionList[] = `ls -sl`;	// make a selection list
+	int $selectionCount = size( $selectionList );
+	if ( $selectionCount < 3 )		// check the number of objects selected
+	  error "Wrong number of objects selected !!";
+	$BSNode = $selectionList[0];	// set the blendshape node
+	$base = $selectionList[$selectionCount - 1];	// set the base
+	for ($i = 1 ; $i < $selectionCount - 1 ; ++$i)	// set the sources list
+	  $sources[$i - 1] = $selectionList[$i];
+	$sliderName = `textFieldGrp -q -text 	BSSliderNameTF_RT`;
+  } // end if
+
+  if (`objectType $BSNode` != "blendShape")	// check if blendshape node is select correctly
+	error "Wrong selection <blendshape> !!";
+
+  int $BSWeightCount = `blendShape -q -wc	   $BSNode`;
+  int $index = $BSWeightCount;	// set the index of the blendshape to add
+
+  int $srcNum = size( $sources );
+  switch( $srcNum ) {
+    case 1:	// one pos is selected, so slider is 1d corner slider
+	string $sliderChnls[2] = makeSliderProc_RT( $sliderName, 1, 1 );	// create the 1d corner slider
+	blendShape -e -t $base $index $sources[0] 1	$BSNode;		// add the source to the blendShape node
+	connectAttr -f $sliderChnls[1] ($BSNode + "." + $sources[0]);		// connect the tweker right <tx> to the blendShape node weight
+	break;
+    case 2:	// two poses are selected, so slider is 2d corner slider
+	int $twoChnlMod = `radioButtonGrp -q -sl		BSTwoChnlModRB_RT`;
+	string $sliderChnls[3];
+	if ($twoChnlMod == 1)	// set to 1d center slider
+	  $sliderChnls = makeSliderProc_RT( $sliderName, 1, 2 );	// create the 1d center slider
+	else if ($twoChnlMod == 2)	// set to 2d corner slider
+	  $sliderChnls = makeSliderProc_RT( $sliderName, 2, 1 );	// create the 2d corner slider
+	blendShape -e -t $base $index $sources[0] 1	$BSNode;		// add the sources to the blendShape node
+	blendShape -e -t $base (++$index) $sources[1] 1	$BSNode;		// add the sources to the blendShape node
+	connectAttr -f $sliderChnls[1] ($BSNode + "." + $sources[0]);		// connect the tweker right <tx> to the blendShape node weight
+	connectAttr -f $sliderChnls[2] ($BSNode + "." + $sources[1]);		// connect the tweker up <ty> to the blendShape node weight
+	break;
+    case 4:	// four poses are selected, so slider is 2d corner slider
+	string $sliderChnls[5] = makeSliderProc_RT( $sliderName, 2, 2 );	// create the 2d corner slider
+	blendShape -e -t $base $index $sources[0] 1	$BSNode;		// add the sources to the blendShape node
+	blendShape -e -t $base (++$index) $sources[1] 1	$BSNode;		// add the sources to the blendShape node
+	blendShape -e -t $base (++$index) $sources[2] 1	$BSNode;		// add the sources to the blendShape node
+	blendShape -e -t $base (++$index) $sources[3] 1	$BSNode;		// add the sources to the blendShape node
+	connectAttr -f $sliderChnls[1] ($BSNode + "." + $sources[0]);		// connect the tweker right <tx> to the blendShape node weight
+	connectAttr -f $sliderChnls[2] ($BSNode + "." + $sources[1]);		// connect the tweker left <-tx> to the blendShape node weight
+	connectAttr -f $sliderChnls[3] ($BSNode + "." + $sources[2]);		// connect the tweker up <ty> to the blendShape node weight
+	connectAttr -f $sliderChnls[4] ($BSNode + "." + $sources[3]);		// connect the tweker down <-ty> to the blendShape node weight
+	break;
+  } // end switch
+
+
+  return $sliderChnls[0];	// return the tweaker
+
+} // end proc setBlendShapeProc_RT

@@ -1,0 +1,67 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//setSpineSSProc_RT.mel//////
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+
+if (`window -exists   setSpineSSWin_RT`)
+  deleteUI 	setSpineSSWin_RT;
+window -t "Set BlendShape"	   setSpineSSWin_RT;
+columnLayout -adj 1;
+
+  text -l "select the start joint, end joint \n and the spline curve respectively";
+  button -l "Set Spine SS" -c "setSpineSSProc_RT( \"\", \"\", \"\" )";
+
+showWindow  setSpineSSWin_RT;
+
+
+/* for reusability this proc takes args */
+global proc int 	  setSpineSSProc_RT (string $sJoint, string $eJoint, string $curve) {
+
+  if ($sJoint == "") {	// check if its called from UI or proc
+	string $selectionList[] = `ls -sl -typ transform`;
+	if (size( $selectionList ) != 3)
+	  error "Three objects must be selected !!";
+
+	$sJoint = $selectionList[0]; // start joint
+	$eJoint = $selectionList[1]; // end joint
+	$curve = $selectionList[2];  // IK curve
+  } // end if
+
+  string $LR = getPart_x_str( $sJoint, 1 ); // get the LR part of the joint name
+  string $mid = getPart_x_str( $sJoint, 2 ); // get the middle part of the joint name
+  string $baseName = $LR + "_" + $mid; // contatenate to make the base name
+
+  string $curveInfo = `arclen -ch 1 $curve`;	// create an arclen node to have the length info of the curve
+
+  string $multDivNode = `createNode multiplyDivide -n 	($baseName + "SSMultDiv")`;   // multDiv node to normalize the length of the curve
+  connectAttr -f ($curveInfo + ".arcLength") ($multDivNode + ".input1X");
+
+  float $initLen = `getAttr ($curveInfo + ".arcLength")`; // get the initial length of the curve
+  setAttr ($multDivNode + ".input2X") $initLen;	// set the second term of the multDiv node to initial length of the curve
+  setAttr ($multDivNode + ".operation") 2;	// set to divide mode
+
+//  create condition node
+  string $condNode = `createNode condition -n 	($baseName + "SSCond")`;	// set condition to prevent squashing
+  connectAttr -f ($multDivNode + ".outputX") ($condNode + ".firstTerm");
+  connectAttr -f ($multDivNode + ".outputX") ($condNode + ".colorIfTrueR");
+  setAttr ($condNode + ".secondTerm") 1.0;
+  setAttr ($condNode + ".operation") 2;
+
+
+  string $jList[] = `ls -dag -ap -typ joint $sJoint`;
+  string $thisJoint;
+  int $i = 0;
+  while ($jList[$i] != $eJoint) {
+    connectAttr -f ($condNode + ".outColorR") ($jList[$i] + ".scaleX");
+    ++$i;
+  } // end while
+
+
+  return 1;	// successful return
+
+} // end proc setSpineSSProc_RT
+
+

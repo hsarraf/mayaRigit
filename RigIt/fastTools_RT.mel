@@ -1,0 +1,203 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//fastTools_RT.mel///////////
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+if (`window -exists   fastToolsWin_RT`)
+  deleteUI fastToolsWin_RT;
+window -t "Fast Tools"	fastToolsWin_RT;
+
+scrollLayout;
+
+ columnLayout -adj 1;
+
+  frameLayout -l "Rotation Axis" -bs "etchedIn" -cll 1 -cl 1;	// frame layout for rotation axis setting
+    columnLayout -adj 1;
+      floatFieldGrp -l "Value" -h 17 -adj 1 -cal 1 left -v1 180	rotAxisValFF_RT;
+      rowLayout -nc 3;
+	 button -l "X" -h 17 -c "setRotationAxisProc_RT( {}, 0.0, \"x\" )";
+	 button -l "Y" -h 17 -c "setRotationAxisProc_RT( {}, 0.0, \"y\" )";
+	 button -l "Z" -h 17 -c "setRotationAxisProc_RT( {}, 0.0, \"z\" )";
+      setParent..;	// end rowLayout
+      button -l "Reset Joints Orient" -h 17 -c "orientJointProc_RT( {}, \"rjo\" )";
+      button -l "Reset Chain Orient" -h 17 -c "orientJointProc_RT( {}, \"rco\" )";
+      //button -l "Set Orient To Zero" -h 17 -c "orientJointProc_RT( {}, \"so2z\" )";
+    setParent..;	// end columnLayout
+  setParent..;	// end frameLayout
+
+  frameLayout -l "Mirror Joint" -bs "etchedIn" -cll 1 -cl 1;	// frame layout for mirror joint setting
+    columnLayout -adj 1;
+//	radioButtonGrp -l "Mirror Plane" -nrb 3 -la3 "XY" "XZ" "YZ" -select 3 -adj 1 -cal 1 left 		mirrorPlaneRB_FT;	
+	textFieldGrp -l "Search For" -h 17 -adj 1 -cal 1 left -text "L_"	  searchForTF_RT;
+	textFieldGrp -l "Search With" -h 17 -adj 1 -cal 1 left -text "R_"	  replaceWithTF_RT;
+	rowLayout -nc 3;
+	  button -l "Mirror XY" -h 17 -c "mirrorJointProc_RT( \"\", \"XY\", \"\", \"\" )";
+	  button -l "Mirror XZ" -h 17 -c "mirrorJointProc_RT( \"\", \"XZ\", \"\", \"\" )";
+	  button -l "Mirror YZ" -h 17 -c "mirrorJointProc_RT( \"\", \"YZ\", \"\", \"\" )";
+	setParent..;	// end rowLayout
+    setParent..;	// end columnLayoout
+  setParent..;	// end frameLayout
+
+  frameLayout -l "Select Chain" -bs "etchedIn" -cll 1 -cl 1;	// frame layout for select chain setting
+    columnLayout -adj 1;
+	button -l "Select Chain" -h 17 -c "selectChainProc_RT( \"\", \"\" )";
+	button -l "Select Tips" -h 17 -c "select -r \"*Tip\";";
+	button -l "Select Non Tips" -h 17 -c "select -d \"*Tip\";";
+    setParent..;	// end columnLayout
+  setParent..;	// end frameLayout
+
+  frameLayout -l "Skin Weight Holder" -bs "etchedIn" -cll 1 -cl 1;	// frame layout for skin holding setting
+    columnLayout -adj 1;
+	textFieldGrp -l "Joint Name" -text "M_root_J" -adj 1 -cal 1 left -h 20  jointNameTF_RT;
+	button -l "Hold Off" -h 17 -c "skinHolderProc_RT( 0 )";
+	button -l "Hold On" -h 17 -c "skinHolderProc_RT( 1 )";
+    setParent..;	// end columnLayout
+  setParent..;	// end frameLayout
+ 
+showWindow   fastToolsWin_RT;
+
+
+
+
+global proc int 	orientJointProc_RT (string $jList[], string $operation) {
+
+  if (size( $jList ) == 0 )		// check if it is called from another proc
+    switch ($operation) {
+      case "rjo":	// set to Reset Joints Orient
+	  $jList = `ls -sl -typ joint`;
+	  break;
+      case "rco":	// set to Reset Chain Orient
+	  $jList = `ls -sl -dag -ap -typ joint`;
+	  break;
+      case "so2z":	// set to Reset joints Orient
+	  $jList = `ls -sl -typ joint`;
+    } // end switch
+
+  string $joint;
+  for ($joint in $jList)
+    joint -e -oj xyz -secondaryAxisOrient yup -zso	$joint;
+
+  return 1;	// successful return
+
+} // end proc orientJointProc_RT
+
+
+	  
+
+
+global proc int 	selectChainProc_RT (string $joint1, string $joint2) {
+
+  if ($joint1 == "") {	// check if it is called from GUI
+	string $jList[] = `ls -sl -typ joint`;
+	int $jNum = size( $jList );
+	if ($jNum == 1)	// one joint is selected
+	  $joint1 = $jList[0];
+	else if ($jNum == 2)	 {    // two joints are selected
+	  $joint1 = $jList[0];
+	  $joint2 = $jList[1];
+	}
+	else
+	  error "No object is selected !!";
+  } // end if
+
+  if ($joint2 == "")		// check if one joint is selected
+	select -r -hi		$joint1;
+  else {
+	string $jList[] = `ls -dag -ap -typ joint 	$joint1`;
+	select -cl;
+	int $i = -1;
+	do {
+	  ++$i;
+	  select -add		$jList[$i];
+	} while ($jList[$i] != $joint2);	// end do-while
+  } // end else
+
+  
+
+  return 1; 	// successful return
+
+} // end proc selectCgainProc_RT
+
+
+
+global proc int 	mirrorJointProc_RT (string $joint, string $mirrorPlane, string $str1, string $str2) {
+
+  if ($joint == "") {	// check if it is called from GUI
+	string $jList[] = `ls -sl -typ joint`;
+	$joint = $jList[0];
+//	$mirrorPlane = `radioButtonGrp -q -select		mirrorPlaneRB_FT`;
+	$str1 = `textFieldGrp -q -text   searchForTF_RT`;
+	$str2 = `textFieldGrp -q -text   replaceWithTF_RT`;
+  }  // end if
+
+  switch ($mirrorPlane) {
+    case "XY":	// set to mirror plane XY
+	mirrorJoint -mirrorXY -mirrorBehavior -searchReplace $str1 $str2	$joint;
+	break;
+    case "XZ":	// set to mirror plane XZ
+	mirrorJoint -mirrorXZ -mirrorBehavior -searchReplace $str1 $str2	$joint;
+	break;
+    case "YZ":	// set to mirror plane YZ
+	mirrorJoint -mirrorYZ -mirrorBehavior -searchReplace $str1 $str2	$joint;
+	break;
+  } // end switch
+
+  return 1;	// successful return
+
+
+} // end proc mirrorJoint_RT
+
+
+
+
+global proc int   setRotationAxisProc_RT (string $jList[], float $value, string $axis) {
+
+  print ("size: " + size( $jList ) + "\n");
+
+  if (size( $jList ) == 0) {	// check if it is called from GUI
+	$jList = `ls -sl -typ joint`;
+	$value = `floatFieldGrp -q -v1	rotAxisValFF_RT`;
+  } // end if
+  string $joint;
+
+  for ($joint in $jList)	// iterate on the selected joints
+    switch ($axis) {
+      case "x":		// set to x axis
+	  print ("val: " + $value + "\n");
+	  rotate -r -os ($value) 0 0 	  ($joint + ".rotateAxis");
+	  break;
+      case "y":		// set to y axis
+	  rotate -r -os 0 ($value) 0 	  ($joint + ".rotateAxis");
+	  break;
+      case "z":		// set to z axis
+	  rotate -r -os 0 0 ($value) 	  ($joint + ".rotateAxis");
+	  break;
+    }	// end switch
+
+  return 1;	// successful return
+
+}	// end proc setRotationAxis
+
+
+
+global proc   skinHolderProc_RT (int $mod) {
+  string $jointsList[];
+  string $jointName = `textFieldGrp -q -text   jointNameTF_RT`;
+  if ($jointName != "")	// check if the joint name field is set
+	$jointsList = `ls -ap -dag -typ joint   $jointName`;
+  else  // otherwise a joint is selected
+	$jointsList = `ls -sl -ap -dag -typ joint`;	// make joint selection list
+  string $joint;
+  string $dest;
+  string $destType;
+  for ($joint in $jointsList) {	// enter the selection list loop
+    string $destList[] = `listConnections -d 1   $joint`;	// list the connections
+    for ($dest in $destList) {	// enter the destination list loop
+	string $destType = `nodeType $dest`;	// get the node type
+	if ($destType == "skinCluster")	// check if the node type is skinCluster
+	  setAttr ($joint + ".liw") ($mod);  // set the liw attribute to mode
+    }  // end inner loop
+  }  // end outer loop
+} // end proc   skinHolderProc_RT

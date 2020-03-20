@@ -1,0 +1,92 @@
+//////////////////////////////////////
+//RigIt1.0////////////////////////////
+//makeProxy4SkeletonProc_RT.mel///////
+//Author	Hadi Sarraf///////////////
+//////////////////////////////////////
+
+
+source "helperProcs.mel";
+
+if (`window -exists   makeProxy4skeletonWin_RT`)
+  deleteUI makeProxy4skeletonWin_RT;
+window -t "Make Proxies"	makeProxy4skeletonWin_RT;
+columnLayout -adj 1;
+
+  floatFieldGrp -l "Radius" -adj 1 -cal 1 left -v1 0.3		proxyRadiusFF_FT;
+  intFieldGrp -l "SubdivX" -adj 1 -cal 1 left -v1 5 		proxySubdivXIF_FT;
+  intFieldGrp -l "SubdivY" -adj 1 -cal 1 left -v1 3		proxySubdivYIF_FT;
+
+  button -l "Make" -c "makeProxy4skeletonProc_RT( \"\", 0.0, 0, 0 )";
+
+showWindow   makeProxy4skeletonWin_RT;
+
+
+
+global proc int	 makeProxy4skeletonProc_RT (string $rootJoint, float $proxyRadius, int $proxySubdivX, int $proxySubdivY) {
+
+  string $jList[];	// chain list
+  string $joint, $child;
+
+  if ($rootJoint == "") {	// check if it is called from GUI
+	$jList = `ls -sl -dag -ap -typ joint`;
+	$proxyRadius = `floatFieldGrp -q -v1	proxyRadiusFF_FT`;
+	$proxySubdivX = `intFieldGrp -q -v1	proxySubdivXIF_FT`;
+	$proxySubdivY = `intFieldGrp -q -v1	proxySubdivYIF_FT`;
+  }  // end if
+  else
+	$jList = `ls -dag -ap -typ joint   $rootJoint`;
+
+  group -em -n "proxies_Grp";	// create a group for the proxies
+
+  for ($joint in $jList) {	// iterate on the joints
+
+// 	print ($joint + "\n");
+
+	vector $jPos = `xform -q -ws -t 	$joint`;	// get the world position of the joint
+	string $childList[] = `listRelatives -c -typ joint $joint`;	// list all the children of the joint
+	if ( size( $childList ) != 0 )	// check if there exists any children
+	  for ($child in $childList) {	// iterate on the children
+		vector $cPos = `xform -q -ws -t 	$child`;	// get the world position of the child
+		string $proxy = makeProxy( $joint, $child, $jPos, $cPos, $proxyRadius, $proxySubdivX, $proxySubdivY );	// make the proxy
+		parent $proxy 	"proxies_Grp";	// add the proxy under the proxies_Grp
+	  } // end inner for
+
+  } // end outer for
+
+  select -cl;
+
+  return 1; 	// successful return
+
+}  // end proc makeProxy4skeleton_RT
+		
+
+
+global proc string	  makeProxy (string $joint, string $name, vector $start, vector $end, float $radius, float $subdivX, float $subdivY) {
+
+  string $proxyName = getPart_x_str( $name, 1 ) + "_" + getPart_x_str( $name, 2 ) + "_Prx";
+
+  float $height = mag( $start - $end );	// get the height of the proxy
+  string $proxyL[] = `polyCylinder -ch on -o on 
+			-sx $subdivX -sy $subdivY -height $height -radius $radius -cuv 3 -n $proxyName`;
+
+  string $proxy = $proxyL[0];
+  move -r 0 ($height / 2) 0 $proxy;	// move the proxy h/2 unit up
+  move -r 0 (-$height / 2) 0 ($proxy + ".scalePivot") ($proxy + ".rotatePivot");	// move the proxy pivot h/2 unit down
+  makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $proxy;	// freeze the proxy
+    
+
+  move -a ($start.x) ($start.y) ($start.z)   $proxy;	// move the proxy to the joint position
+  string $tempLoc[] = `spaceLocator`;	// create a locator for the aim
+  move -a  ($end.x) ($end.y) ($end.z)	$tempLoc[0];	// move the locator to the end position
+  string $aimConst[] = `aimConstraint -offset 0 0 0 -weight 1 -aimVector 0 1 0 -upVector 0 1 0 -worldUpType "vector" -worldUpVector 0 1 0
+									$tempLoc[0]	$proxy`;	// use aim constraint to set the direction of the proxy
+  // delete all the unnecessary nodes  
+  delete $aimConst[0];
+  delete $tempLoc;
+
+  parentConstraint -mo -weight 1 $joint	$proxy;	// use parent constraint to parent the proxy to the joint
+
+
+  return $proxy;	// return the proxy
+
+} // end proc makeProxy

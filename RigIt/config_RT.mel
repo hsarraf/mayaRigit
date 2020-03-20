@@ -1,0 +1,6 @@
+//////
+//NA//
+//////
+
+global int $BH_RT = 17;						// button height
+global string $STEAKPLUGINPATH_RT = "c://steak.mll";		// steak plugin path for steak node

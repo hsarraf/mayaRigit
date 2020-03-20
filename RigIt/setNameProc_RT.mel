@@ -1,0 +1,118 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//setNameProc_RT.mel/////////
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+if (`window -exists setNameWin_RT`)
+  deleteUI setNameWin_RT;
+window -t "Set Name" 	setNameWin_RT;
+columnLayout -adj 1;
+
+  textFieldGrp -l "Name" 	
+			-adj 1 -cal 1 left 		nameTF_RT;
+
+  separator -h 10;
+
+  checkBox -l "Set Tip" 		tipCB_RT;
+  checkBox -l "Hierarchy"		hierarchyCB_RT;
+
+  radioButtonGrp -nrb 3 -l "Mask" -la3 "Joint" "Custom" "All" 
+					-adj 1 -cal 1 left 		
+					-on2 "textField -e -en 1 customMask_RT;"
+					-of2 "textField -e -en 0 customMask_RT;"
+							 	MaskRB_RT;
+  textField -en 0 	customMask_RT;
+
+  separator -h 10;
+
+  button -l "Set Name" -c "setNameProc_RT";
+
+showWindow setNameWin_RT;
+
+
+
+global proc 	setNameProc_RT() {
+
+  string $newName = `textFieldGrp -q -text nameTF_RT`;
+  int $hierarchyStat = `checkBox -q -value hierarchyCB_RT`;
+  int $maskStat = `radioButtonGrp -q -select MaskRB_RT`;
+
+  string $objList[];
+ 
+  if ($hierarchyStat == 0)	// check hierarchy state if it is off
+    switch ($maskStat) {
+	case 1:	// check mask state if it is set to joint
+		$objList = `ls -sl -typ joint`;
+		break;
+
+	case 2:	// check mask state if it is set to given type
+ 		string $type = `textField -q -text customMask_RT`;
+		$objList = `ls -sl -typ $type`;
+		break;
+
+	case 3:	// check mask state if it is set to all types
+		$objList = `ls -sl`;
+
+	default:	// no mask is set
+		error "No mask is set !!";
+		break;
+    }
+
+  else if ($hierarchyStat == 1)	// check hierarchy state if it is on
+    switch ($maskStat) {
+	case 1:	// check mask state if it is set to joint
+		$objList = `ls -sl -dag -ap -typ joint`;
+		break;
+
+	case 2:	// check mask state if it is set to given type
+ 		string $type = `textField -q -txt customMask_RT`;
+		$objList = `ls -sl -dag -ap -typ $type`;
+		break;
+
+	case 3:	// check mask state if it is set to all types
+		$objList = `ls -sl -dag -ap`;
+		break;
+
+	default:	// no mask is set
+		error "No mask is set !!";
+		break;
+    }
+/*
+  else
+	error "Unkown parameters !!";
+*/
+
+  int $i = 0;
+  string $objSelectedList[] = `ls -sl`;
+  switch (size( $objSelectedList )) {
+    case 0:	// no object selected
+	error "No object is selected !!";
+	break;
+
+    case 1:	// one object selected
+	string $oldName;
+	for ($oldName in $objList) {
+	  rename $oldName ($newName + $i);
+	  ++$i;
+	}
+	break;
+
+    case 2:	// two objects selected
+	string $oldName;
+	for ($oldName in $objList) {
+	  rename $oldName ($newName + $i);
+	  if ($oldName == $objSelectedList[1])
+		break;
+	  ++$i;
+	}
+	break;
+
+} 	// end switch
+
+  if (`checkBox -q -value tipCB_RT`)	// check if set tip is on
+	rename $oldName ($newName + "Tip");
+
+}	// end proc setNameProc_RT
+

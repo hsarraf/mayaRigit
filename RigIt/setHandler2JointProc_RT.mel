@@ -1,0 +1,140 @@
+////////////////////////////////
+//RigIt1.0//////////////////////
+//setHandler2JointProc_RT.mel///
+//Author	Hadi Sarraf/////////
+////////////////////////////////
+
+
+if (`window -exists setHandler2JointWin_RT`)
+  deleteUI setHandler2JointWin_RT;
+window -t "Set Handler" setHandler2JointWin_RT;
+columnLayout -adj 1;
+
+ frameLayout -l "Set Icon" -bs "etchedIn" -cll 1 -cl 1;
+  columnLayout -adj 1;
+   radioButtonGrp -nrb 2 -l "Handler Type" -la2 "Selected" "Circle" -select 1
+								-adj 1 -cal 1 left	 handlerTypRB_RT;
+   radioButtonGrp -nrb 2 -l "Based On" -la2 "Itself" "Parent" -select 1
+								-adj 1 -cal 1 left	 handlerModRB_RT;
+   textFieldGrp -l "Name" -adj 1 -cal 1 left	handlerNameTF_RT;
+   button -l "Set" -h 17 -c "setHandler2JointProc_RT( \"\", \"\", 0, 0, \"\" )";
+  setParent..;  // columnLayout
+ setParent..;  // frameLayout
+
+ frameLayout -l "Mirror Icon" -bs "etchedIn" -cll 1 -cl 1;
+  columnLayout -adj 1;
+   button -l "X Mirror" -h 17 -c "mirrorIconProc_RT( \"x\" )";
+   button -l "Y Mirror" -h 17 -c "mirrorIconProc_RT( \"y\" )";
+   button -l "Z Mirror" -h 17 -c "mirrorIconProc_RT( \"z\" )";
+  setParent..;  // columnLayout
+ setParent..;  // frameLayout
+
+
+showWindow setHandler2JointWin_RT;
+
+
+
+/* the icon has to be set on the origin */
+/* for reusability this proc takes two args */
+
+global proc string	setHandler2JointProc_RT (string $handler, string $this, int $typ, int $mod, string $hName) {	// set the handler on this object <joint>
+
+  int $mod, $typ;
+  float $thisRot[3];
+
+  if ($handler == "") {	// it means this is called from GUI
+	$mod = `radioButtonGrp -q -select  handlerModRB_RT`;
+	$typ = `radioButtonGrp -q -select  handlerTypRB_RT`;
+	$hName = `textFieldGrp -q -text 	 handlerNameTF_RT`;
+	switch ($typ) {
+      	  case 1:	// set to selected
+		string $selectionList[] = `ls -sl`;
+		if (size( $selectionList ) != 2)
+		  error "Two objects has to be selected !!";
+		$handler = $selectionList[0];
+		$this = $selectionList[1];
+		break;
+      	  case 2:	// set to circle
+		string $selectionList[] = `ls -sl`;
+		if (size( $selectionList ) != 1)
+		  error "One object has to be selected !!";
+		string $circle[] = `circle -ch off -o on -nr 1 0 0 -r 1`;
+		$handler = $circle[0];
+		$this = $selectionList[0];
+		break;
+	} // end switch
+  } // end if
+
+  else if ($typ == 2) {
+	string $circle[] = `circle -ch off -o on -nr 1 0 0 -r 1`;
+	$handler = $circle[0];
+  }
+
+  switch ($mod) {
+
+    case 1:	// set to itself
+	$thisRot = `xform -q -ws -ro $this`;
+	break;
+
+    case 2:	// set to parent
+	string $jParentList[] = `listRelatives -p -typ joint $this`;
+	switch (size( $jParentList )) {
+	  case 0:	// no parent
+		$thisRot = {0.0, 0.0, 0.0};		// set the rotation to zero
+		break;
+	  case 1:	// One parent
+		$thisRot = `xform -q -ws -ro $jParentList[0]`;	 // get the world rotation of this icon
+		break;
+  	} // end inner switch
+
+	break;
+
+    default:
+	error "No mode is selected !!";
+
+
+  } // end outer switch
+
+
+  float $thisPos[3] = `xform -q -ws -t $this`; // get the world position of this icon
+
+  float $handlerPos[3] = `getAttr ($handler + ".t")`; // get the position of the handler
+  makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $handler; // freeze the handler
+  
+  string $handlerGrp = `group $handler`;		// make a group for the handler
+//  xform -os -piv $handlerPos[0] $handlerPos[1] $handlerPos[2];	// set the pivot of the group on the handler
+  
+  move -a ($thisPos[0]) ($thisPos[1]) ($thisPos[2]) $handlerGrp;	// set the position of handler
+  rotate -a ($thisRot[0]) ($thisRot[1]) ($thisRot[2]) $handlerGrp;	// set the rotation of handler
+
+  if ($hName == "")	// check if $hName is set or not
+	$hName = "null";
+  rename $handler		$hName;	// rename the handler
+//  string $hgName = getPart_x_str( $handler, 1 ) + "_" + getPart_x_str( $handler, 2 ) + "_Grp";
+  rename $handlerGrp		($hName + "_Grp");	// rename the handler group
+
+  select -cl;
+
+  return $hName; 	// return the handler, so it can be handled
+
+} // end proc setHandler2JointProc_RT
+
+
+//string $h = setHandler2JointProc_RT( "null", "joint3", 2, 1, "L_hand" );
+
+
+
+global proc mirrorIconProc_RT (string $axis) {
+
+string $list[] = `ls -sl`;	// Make a selecrtion list
+string $icon = $list[0];
+string $iconCopy[] = `duplicate -rr $icon`; // duplicate from the selected icon
+string $iconGrp = `group $iconCopy`;	// group the duplicated icon
+xform -os -piv 0 0 0 $iconGrp;	// zero the pivot of the group
+setAttr ($iconGrp + ".s" + $axis) (-1.0);	  // mirror the icon based on the axis
+parent -w $iconCopy;  // parent the duplicated icon
+delete $iconGrp;	// delete the icon group
+makeIdentity -apply true -t 1 -r 1 -s 1 -n 0  $iconCopy;  // freeze the duplicated icon
+
+}  // end proc  mirrorIconProc_RT
+

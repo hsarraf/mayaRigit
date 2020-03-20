@@ -1,0 +1,50 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//helperProcs.mel////////////
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+global proc string	getPart_x_str (string $str, int $x) {	// x is the index of the phrase
+								// after or before "_" character
+
+  string $strArr[];
+
+  int $numTokens = `tokenize $str "_" $strArr`;
+  if ($numTokens < $x) {
+	warning "Incompatible size of tokens";
+	return $str;
+  }
+
+  return $strArr[$x - 1];
+
+} // end proc getPart_x_str
+
+
+
+
+global proc 	setPos2This (string $this) {  // set the position of the selected object to this object given
+  
+  vector $thisPos = `xform -q -ws -t $this`;
+  move -a ($thisPos.x) ($thisPos.y) ($thisPos.z);
+
+} // end proc setPos2This
+
+
+
+
+global proc float 	getJointHierarchyLen (string $sJoint, string $eJoint) {	// get the length of the joint hierarchy
+											// beetween sJoint and eJoint
+//  select $sJoint;
+  string $jList[] = `ls -dag -ap -typ joint $sJoint`;
+  float $dist = 0; 
+  int $i = 1;
+  do {
+	$dist += `getAttr ($jList[$i] + ".tx")`;
+	++$i;
+  } while ($jList[$i] == $eJoint);
+
+
+  return $dist;
+
+} // end proc getJointHierarchyLen

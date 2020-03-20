@@ -1,0 +1,167 @@
+///////////////////////////////
+//RigIt1.0/////////////////////
+//setMuscleJiggleProc_RT.mel///
+//Author	Hadi Sarraf////////
+///////////////////////////////
+
+
+
+global string $STEAKPLUGINPATH_RT = "c://steak.mll";
+
+if (`window -exists   setMuscleJiggleWin_RT`)
+  deleteUI   setMuscleJiggleWin_RT;
+window -t "Set Musle Jiggle"	setMuscleJiggleWin_RT;
+columnLayout -adj 1;
+  button -l "Set Dynamics Node"   -c "setDynNodeProc_RT";
+  textField -text "Select the hair system node if it exists" -en 0	hairSysNameTF_RT;
+  separator -h 10;
+  textFieldGrp -l "Base Name" -adj 1 -cal 1 left    jiggleBaseNameTF_RT;
+  button -l "Initiate -> naming and making locator" -c "initiateMuscleJiggleProc_RT";
+  separator -h 10;
+  text -l "Select the locator and then select the joint";
+  button -l "Generate Dynamic Jiggle" -c "setMuscleJiggleProc_RT( \"\", \"\", \"\", \"\" )";
+
+  frameLayout -l "Bake Jiggle" -cll 1 -cl 1;
+    columnLayout -adj 1;
+	intFieldGrp -l "Start Frame" -v1 0 -adj 1 -cal 1 left   bakeJiggleStartFrmIF_RT;
+	intFieldGrp -l "End Frame" -v1 24 -adj 1 -cal 1 left   bakeJiggleEndFrmIF_RT;
+	text -l "Select the joint having the jiggle movements";
+	button -l "Bake"   -c  "bakeJiggleProc_RT( \"\", 0, 0 )";
+    setParent..;	// enclose the columnLayout
+  setParent..;	// enclose the frameLayout
+
+showWindow    setMuscleJiggleWin_RT;
+
+
+global proc 	 setMuscleJiggleProc_RT (string $locator, string $joint, string $hairSysNode, string $baseName) {
+
+  global string $STEAKPLUGINPATH_RT;	// extern $STEAKPLUGINPATH_RT from config_RT.mel file
+
+  if ($locator == "") {	// check if it is called from GUI
+	string $selectionList[] = `ls -sl -tr`;
+	$locator = $selectionList[0];
+	$joint = $selectionList[1];
+  	$hairSysNode = `textField -q -text     hairSysNameTF_RT`;
+	$baseName = `textFieldGrp -q -text  jiggleBaseNameTF_RT`;
+  }  // end if
+
+  string $hairSysTrsL[] = `listRelatives -p   $hairSysNode`;	// get the transform node of the hair system
+  string $hairSysTrs = $hairSysTrsL[0];
+
+  vector $locPos = getAttr ($locator + ".t");		// get the position of the locator
+  vector $jointPos = getAttr ($joint + ".t");		// get the position of the joint
+  vector $midPos = <<($locPos.x + $jointPos.x) / 2, 
+			 ($locPos.y + $jointPos.y) / 2, 
+			 ($locPos.z + $jointPos.z) / 2>>;		// get the middle position of loc and joint
+  string $curveName = $baseName + "Hj_Cur";
+  string $curve = `curve -d 2 -p ($locPos.x) ($locPos.y) ($locPos.z)
+				   -p ($midPos.x) ($midPos.y) ($midPos.z) 
+				   -p ($jointPos.x) ($jointPos.y) ($jointPos.z)
+						-k 0 -k 0 -k 1 -k 1 -n $curveName`;	// create a curve from loc to joint
+
+  select -r $curve;
+  select -add $hairSysNode;
+  makeCurvesDynamicHairs 0 0 1;	// make the curve dynamic
+  
+  string $newFollicleL[] = `listRelatives -c ($hairSysTrs + "Follicles")`;	// get the new follicle created
+  string $newFollicle = $newFollicleL[0];
+  string $newOutCurveL[] = `listRelatives -c ($hairSysTrs + "OutputCurves")`; // get the new out curve created
+  string $newOutCurve = $newOutCurveL[0];
+  setAttr ($newFollicle + ".pointLock") 1;	// lock the base of the curve
+  if (!`pluginInfo -q -loaded   $STEAKPLUGINPATH_RT`)	// load the steak plugin if it is not loaded
+    loadPlugin $STEAKPLUGINPATH_RT;
+
+  //  create the steak node, set and connect the attributes
+  //
+  string $steak = `createNode steak`;
+  setAttr ($steak + ".index") 2;
+  connectAttr -f ($newOutCurve + ".local") ($steak + ".inCurve");
+  connectAttr -f ($steak + ".outPos") ($joint + ".t");
+
+  parentConstraint -mo -weight 1  $locator  $newFollicle;	// parent constraint the locator
+  orientConstraint -mo -weight 1    $locator   $joint;		// orient constraint the locator
+
+  // set the names of the new created nodes
+  // 
+  string $newFollicleName = $baseName + "Hj_Fol";
+  string $newOutCurveName = $baseName + "OutHj_Cur";
+  rename  $newFollicle  $newFollicleName;
+  rename  $newOutCurve  $newOutCurveName;
+
+  string $jiggleGrp = $baseName + "Hj_Grp";
+  group -n $jiggleGrp	$locator  $joint  $newFollicleName  $newOutCurveName;	// group all the created nodes
+
+  setAttr ($newFollicleName + ".v") 0;
+  setAttr ($newOutCurveName + ".v") 0;
+
+
+}   // end proc   setMuscleJiggleProc_RT
+
+
+global proc     initiateMuscleJiggleProc_RT() { 
+  string $baseName = `textFieldGrp -q -text  jiggleBaseNameTF_RT`;
+  string $locatorName = $baseName + "Hj_Loc";	// HairJiggle_Loc
+  string $jointName = $baseName + "Hj_J";		// HairJiggle_J
+  string $selectionList[] = `ls -sl -typ joint`;
+  string $joint = $selectionList[0];
+  float $jPos[3] = getAttr ($joint + ".t");	// get the position of the joint
+  string $locatorL[] = `spaceLocator -n $locatorName`;	// create a locator
+  string $locator = $locatorL[0];
+  move -a ($jPos[0]) ($jPos[1]) ($jPos[2]);	// move the locator to the position of the joint
+  rename $joint $jointName;		// rename the joint
+}  // end proc   initiateMuscleJiggleProc_RT
+  
+
+
+global proc string 	setDynNodeProc_RT() {
+
+  string $sList[] = `ls -sl`;
+  string $hairSys = $sList[0];
+  string $hairSysShapeL[] = `listRelatives -s   $hairSys`;	// get the shape node of the hair system
+  string $hairSysShape = $hairSysShapeL[0];
+
+  if (`objectType $hairSysShape` != "hairSystem") {		// check if it is a hair system node
+	string $msg = "This node is not a hair system !!";
+	warning $msg;
+	textField -e -text $msg 	hairSysNameTF_RT;
+	return "";
+  }  // end if
+  //  set the hair system attributes
+  //
+  setAttr ($hairSysShape + ".iterations") 32;
+  setAttr ($hairSysShape + ".drag") 0.0;
+  setAttr ($hairSysShape + ".gravity") 0.0;
+  setAttr ($hairSysShape + ".damp") 0.25;
+
+  textField -e -text $hairSysShape 	hairSysNameTF_RT;	// set the textField of the GUI
+  return $hairSysShape;		// return the hair system shape node
+
+}  // end proc  setDynNodeProc
+  
+  
+
+global proc int   bakeJiggleProc_RT (string $joint, int $startFrm, int $endFrm) {
+
+  if ($joint == "") {	// check if it is called from GUI
+	string $selectionList[] = `ls -sl -typ joint`;
+	$joint = $selectionList[0];
+	$startFrm = `intFieldGrp -q -v1 bakeJiggleStartFrmIF_RT`;
+	$endFrm = `intFieldGrp -q -v1 bakeJiggleEndFrmIF_RT`;
+  }
+
+  bakeResults -simulation true 
+			-t ($startFrm + ":" + $endFrm) -sampleBy 1 
+			-disableImplicitControl true -preserveOutsideKeys true -sparseAnimCurveBake false 
+			-at "tx" -at "ty" -at "tz" -at "rx" -at "ry" -at "rz" 		$joint;		// bake the movements
+
+  string $parentList[] = `listRelatives -p  $joint`;	// get the jiggle group
+  string $jiggleGrp = $parentList[0];
+  string $childList[] = `listRelatives -c  $joint`;	// get the orient constraint
+  string $orientConst = $childList[0];
+  parent -w $joint;		// unparent the joint from the jiggle group
+  delete $jiggleGrp $orientConst;	// delete the extra nodes
+
+  return 1;	// successful return
+
+}
+

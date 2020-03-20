@@ -1,0 +1,73 @@
+//////////////////////////////////
+//RigIt1.0////////////////////////
+//jointManipProc_RT.mel///////////
+//Author	Hadi Sarraf///////////
+//////////////////////////////////
+
+
+// make the window to manipulate
+global proc   showJointManipWinProc_RT() {
+if (`window -exists jointManipWin_RT`)
+  deleteUI jointManipWin_RT;
+window -t "Joint Manip" 	jointManipWin_RT;
+
+columnLayout -adj 1;
+
+  button -l "Get Handlers"  -c "jointManipProc_RT( \"\" )";
+
+showWindow jointManipWin_RT;
+}
+
+
+global proc int	jointManipProc_RT (string $joint) {
+
+if ($joint == "") {	// check if it is called from GUI
+  string $selectionList[] = `ls -sl -typ joint`;
+  if (size( $selectionList ) != 1) {	// check the number of selection
+	warning "Wrong selection !!";
+	return 0;	// failure return
+  } // end inner if
+  $joint = $selectionList[0];
+}  // end outer if
+
+showJointManipWinProc_RT();
+
+string $joint2Scale;		// joint that has to be scaled
+string $jChildList[] = `listRelatives -typ joint -c $joint`;
+switch (size( $jChildList )) {
+
+  case 0:	// no children
+	  attrFieldSliderGrp -l "SX" -min -10 -max 10 -adj 1 -cal 1 left
+						-at ($joint + ".translateX");
+  	break;
+
+  case 1:	// just one child
+ 	$joint2Scale = $jChildList[0];
+	attrFieldSliderGrp -l "SX" -min -10 -max 10 -adj 1 -cal 1 left 
+						-at ($joint2Scale + ".translateX");
+	break;
+
+  default:
+	attrFieldSliderGrp -l "SX" -min -10 -max 10 -adj 1 -cal 1 left -en 0;
+	break;
+}	// end switch
+
+
+  separator -h 10;
+
+  attrFieldSliderGrp -l "RX" -min -180 -max 180 -adj 1 -cal 1 left 
+						-at ($joint + ".jointOrientX");
+  attrFieldSliderGrp -l "RY" -min -180 -max 180 -adj 1 -cal 1 left 
+						-at ($joint + ".jointOrientY");
+  attrFieldSliderGrp -l "RZ" -min -180 -max 180 -adj 1 -cal 1 left 
+						-at ($joint + ".jointOrientZ");
+
+
+  return 1;	// successful return
+
+
+} // end proc jointManipProc_RT
+
+//  call to show the GUI
+//
+showJointManipWinProc_RT();

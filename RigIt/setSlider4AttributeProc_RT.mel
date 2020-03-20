@@ -1,0 +1,185 @@
+///////////////////////////////////
+//RigIt1.0/////////////////////////
+//setSlider4AttributeProc_RT.mel///
+//Author	Hadi Sarraf////////////
+///////////////////////////////////
+
+
+
+if (`window -exists   setSlider4AttributeWin_RT`)
+  deleteUI 	setSlider4AttributeWin_RT;
+window -t "Set Slider For Attribute"	   setSlider4AttributeWin_RT;
+columnLayout -adj 1;
+  textFieldGrp -l "Slider Name" -adj 1 -cal 1 left  	AttrSliderNameTF_RT;
+  textFieldButtonGrp -l "Channel 1" -bl "Set Channel 1" -adj 1 -cal 1 left -bc "setChannelProc_RT( 1 )"	channel1TFB_RT;
+  textFieldButtonGrp -l "Channel 2" -bl "Set Channel 2" -adj 1 -cal 1 left -bc "setChannelProc_RT( 2 )"	channel2TFB_RT;
+  radioButtonGrp -l "Mode" -nrb 2 -la2 "1D Center" "2D Corner" -sl 1 -adj 1 -cal 1 left   twoChnlModRB_RT; 
+  textFieldButtonGrp -l "Channel 3" -bl "Set Channel 3" -adj 1 -cal 1 left -bc "setChannelProc_RT( 3 )"	channel3TFB_RT;
+  textFieldButtonGrp -l "Channel 4" -bl "Set Channel 4" -adj 1 -cal 1 left -bc "setChannelProc_RT( 4 )"	channel4TFB_RT;
+  button -l "Set Slider" -c "setSlider4AttributeProc_RT( {}, \"\", 0 )";
+  separator -h 15;
+  button -l "Reset 1d Tweaker" -c "resetTweakerProc( \"1d\" )";
+  button -l "Reset 2d Tweaker" -c "resetTweakerProc( \"2d\" )";
+showWindow 	setSlider4AttributeWin_RT;
+
+
+global proc string 		setSlider4AttributeProc_RT (string $channels[], string $sliderName, string $sType) {
+
+  if (size( $channels ) == 0)  {	// check if it is called from GUI
+	$sliderName = `textFieldGrp -q -text     AttrSliderNameTF_RT`;
+  	string $channel1 = `textFieldButtonGrp -q -text   channel1TFB_RT`;
+  	string $channel2 = `textFieldButtonGrp -q -text   channel2TFB_RT`;
+  	string $channel3 = `textFieldButtonGrp -q -text   channel3TFB_RT`;
+  	string $channel4 = `textFieldButtonGrp -q -text   channel4TFB_RT`;
+
+  	if ($channel1 == "") {	// check the first field if it is empty
+		warning "Wrong setting !!";
+		return "";
+ 	}
+  	else	  // the first field is set
+    	  if ($channel2 == "") {	// check the second field if it is empty
+		/* 1d Corner */
+		$channels[0] = $channel1;
+		return MakeSlider4AttrProc_RT( $channels, $sliderName, "1dcrnr" );	// call to make the 1d corner slider
+    	  }
+    	  else   // the second field is set
+	    if ($channel3 == "") {    // check the third field if it is empty
+	  	/* 1d Center or 2d Corner */
+	  	$channels[0] = $channel1;
+	  	$channels[1] = $channel2;
+		int $twoChnlMod = `radioButtonGrp -q -sl   twoChnlModRB_RT`;
+		if ($twoChnlMod == 1) {
+		  /*1d center*/
+		  return MakeSlider4AttrProc_RT( $channels, $sliderName, "1dcntr" );	// call to make the 1d center slider
+		}
+		else if ($twoChnlMod == 2) {
+		  /*2d corner*/
+		  return MakeSlider4AttrProc_RT( $channels, $sliderName, "2dcrnr" );	// call to make the 2d corner slider
+		}
+	    }
+	    else   // the third field is set
+	  	if ($channel4 == "") {    // check the fourth field if it is empty
+		    warning "Wrong setting !!";
+		    return "";
+	  	  }
+	  	else {    // the fourth field is set
+	    	    /* 2d Center */
+	    	    $channels[0] = $channel1;
+	    	    $channels[1] = $channel2;
+	    	    $channels[2] = $channel3;
+	    	    $channels[3] = $channel4;
+		    return MakeSlider4AttrProc_RT( $channels, $sliderName, "2dcntr" );	// call to make the 2d center slider
+	  	    }
+  } // end if
+
+  return MakeSlider4AttrProc_RT( $channels, $sliderName, $sType );	// if it is called from another proc
+
+} // 	end proc 	setSlider4AttributeProc_RT
+
+
+
+global proc string 		MakeSlider4AttrProc_RT (string $channels[], string $sliderName, string $sType) {
+
+  switch ($sType) {
+    case "1dcrnr":
+	string $slidetChnls[2] = makeSliderProc_RT( $sliderName, 1, 1 );	// make the 1d corner slider
+	connectAttr -f $slidetChnls[1] $channels[0];	// connect slider right channel <tx> to channel[0]
+	break;
+    case "1dcntr":
+	string $slidetChnls[3] = makeSliderProc_RT( $sliderName, 1, 2 );	// make the 1d center slider
+	connectAttr -f $slidetChnls[1] $channels[0];	// connect slider right channel <tx> to channel[0]
+	connectAttr -f $slidetChnls[2] $channels[1];	// connect slider left channel <-tx> to channel[1]
+	break;
+    case "2dcrnr":
+	string $slidetChnls[3] = makeSliderProc_RT( $sliderName, 2, 1 );	// make the 2d corner slider
+	connectAttr -f $slidetChnls[1] $channels[0];	// connect slider right channel <tx> to channel[0]
+	connectAttr -f $slidetChnls[2] $channels[1];	// connect slider up channel <ty> to channel[1]
+	break;
+    case "2dcntr":
+	string $slidetChnls[5] = makeSliderProc_RT( $sliderName, 2, 2 );	// make the 2d center slider
+	connectAttr -f $slidetChnls[1] $channels[0];	// connect slider right channel <tx> to channel[0]
+	connectAttr -f $slidetChnls[2] $channels[1];	// connect slider left channel <-tx> to channel[1]
+	connectAttr -f $slidetChnls[3] $channels[2];	// connect slider up channel <tx> to channel[2]
+	connectAttr -f $slidetChnls[4] $channels[3];	// connect slider down channel <-tx> to channel[3]
+	break;
+  } // end switch
+
+  return $slidetChnls[0];
+
+}  // end proc   MakeSlider4AttrProc_RT
+
+
+
+global proc    setChannelProc_RT (int $indx) {
+
+  string $selectionList[] = `ls -sl`;
+  string $chnl = ($selectionList[0] + ".");
+
+  switch ($indx) {
+    case 1:
+	textFieldButtonGrp -e -text $chnl    channel1TFB_RT;
+	break;
+    case 2:
+	textFieldButtonGrp -e -text $chnl    channel2TFB_RT;
+	break;
+    case 3:
+	textFieldButtonGrp -e -text $chnl    channel3TFB_RT;
+	break;
+    case 4:
+	textFieldButtonGrp -e -text $chnl    channel4TFB_RT;
+	break;
+  }  // end switch
+
+} // end proc   setChannelProc_RT
+
+
+global proc resetTweakerProc (string $type) {
+  // List the tweaker
+  string $tweakers[] = `ls -sl`;
+  string $tweaker = $tweakers[0];
+  if ($type == "1d") {
+	// get the tx values of the tweaker
+	float $tx = getAttr ($tweaker + ".tx");
+	float $oldLimitL = getAttr ($tweaker + ".mtxl");  //  get the min translate limit
+	float $oldLimitR = getAttr ($tweaker + ".xtxl");  //  get the max translate limit
+	float $newLimitL = $oldLimitL - $tx;  // set the left limitation
+	float $newLimitR = $oldLimitR - $tx;  // set the right limitation
+	//  unlock the ty and tz channels
+	setAttr -lock false ($tweaker + ".ty");
+	setAttr -lock false ($tweaker + ".tz");
+	//  freeze the translate channel
+	makeIdentity -apply true -t 1 -r 0 -s 0 -n 0 $tweaker;
+	// reset the limitations
+	transformLimits -tx ($newLimitL) ($newLimitR) -etx 1 1 $tweaker;
+	// lock the channels again
+	setAttr -lock true ($tweaker + ".ty");
+	setAttr -lock true ($tweaker + ".tz");
+  }  // end if
+  else if ($type == "2d") {
+	// get the tx values of the tweaker
+	float $tx = getAttr ($tweaker + ".tx");
+	float $oldLimitL = getAttr ($tweaker + ".mtxl");  //  get the min translate X limit
+	float $oldLimitR = getAttr ($tweaker + ".xtxl");  //  get the max translate X limit
+	float $newLimitL = $oldLimitL - $tx;  // set the left limitation
+	float $newLimitR = $oldLimitR - $tx;  // set the right limitation
+	// get the ty values of the tweaker
+	float $ty = getAttr ($tweaker + ".ty");
+	float $oldLimitD = getAttr ($tweaker + ".mtyl");  //  get the min translate Y limit
+	float $oldLimitU = getAttr ($tweaker + ".xtyl");  //  get the max translate Y limit
+	float $newLimitD = $oldLimitD - $ty;  // set the left limitation
+	float $newLimitU = $oldLimitU - $ty;  // set the right limitation
+	//  unlock the tz channels
+	setAttr -lock false ($tweaker + ".tz");
+	//  freeze the translate channel
+	makeIdentity -apply true -t 1 -r 0 -s 0 -n 0 $tweaker;	
+	// reset the limitations
+	transformLimits -tx ($newLimitL) ($newLimitR) -etx 1 1 $tweaker;
+	transformLimits -ty ($newLimitD) ($newLimitU) -ety 1 1 $tweaker;
+	// lock the channels again
+	setAttr -lock true ($tweaker + ".tz");
+  } // end else
+} // end proc   resetTweakerProc
+
+
+
+

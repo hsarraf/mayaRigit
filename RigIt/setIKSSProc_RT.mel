@@ -1,0 +1,80 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//setIKSSProc_RT.mel/////////
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+if (`window -exists   setIKSSWin_RT`)
+  deleteUI 	setIKSSWin_RT;
+window -t "Set BlendShape"	   setIKSSWin_RT;
+columnLayout -adj 1;
+
+  text -l "select the start joint and end joint respectively";
+  button -l "Set IK SS" -c "setIKSSProc_RT( \"\", \"\" )";
+
+showWindow  setIKSSWin_RT;
+
+
+
+
+/* for reusability this proc takes args */
+global proc int	setIKSSProc_RT (string $sJoint, string $eJoint) {
+
+  if ($sJoint == "") {	// check if its called from UI or proc
+	  string $jSelectedList[] = `ls -sl -typ joint`;
+	  if (size( $jSelectedList ) != 2)
+		error "Wrong number of joints selected !!";
+
+	  $sJoint = $jSelectedList[0];
+	  $eJoint = $jSelectedList[1];
+  } // end if
+
+  string $LR = getPart_x_str( $sJoint, 1 ); // get the LR part of the joint name
+  string $mid = getPart_x_str( $sJoint, 2 ); // get the middle part of the joint name
+  string $baseName = $LR + "_" + $mid; // contatenate to make the base name
+
+  string $sGroup = ($baseName + "_sSSGrp");
+  group -em -n $sGroup; // start group
+  setPos2This( $sJoint );	// set to start joint
+
+  string $eGroup = ($baseName + "_eSSGrp");
+  group -em -n $eGroup; // end group
+  setPos2This( $eJoint );	// set to end joint
+
+  
+
+  string $distNode = `createNode distanceBetween -n ($baseName + "_SSDist")`; // create distance node
+  connectAttr -f ($sGroup + ".t") ($distNode + ".point1"); // connect grp1 to dist
+  connectAttr -f ($eGroup + ".t") ($distNode + ".point2"); // connect grp2 to dist
+
+  string $multDivNode = `createNode multiplyDivide -n ($baseName + "_SSMultDiv")`; // create multDiv node to normalize the distance
+  connectAttr -f ($distNode + ".distance") ($multDivNode + ".input1.input1X"); // connect distance node to multDive node
+  setAttr ($multDivNode + ".operation") 2; 	// set multDiv node to divide
+//  float $distValue = `getAttr ($distNode + ".distance")`;
+  float $jLength = getJointHierarchyLen( $sJoint, $eJoint ); // get the length between sJoint and eJoint
+  setAttr ($multDivNode + ".input2X") $jLength; 	//  set the value of multDiv node to the length
+
+/* now the output of multDive node is the normalized value of the distance.*/
+
+  string $condNode = `createNode condition -n ($baseName + "SSCond")`; // create condition node
+  connectAttr -f ($multDivNode + ".outputX") ($condNode + ".firstTerm"); // connect multDive node to condition node firstTerm
+  connectAttr -f ($multDivNode + ".outputX") ($condNode + ".colorIfTrueR"); // connect multDive node to condition node colorTrue
+  setAttr ($condNode + ".secondTerm") 1.0;
+  setAttr ($condNode + ".operation") 2;
+
+
+//  select $sJoint;
+  string $jList[] = `ls -dag -ap -typ joint $sJoint`;
+  string $thisJoint;
+  for ($thisJoint in $jList) {	 // itaretate on all joints between sJoint and eJoint
+	if ($thisJoint == $eJoint)
+	  break;	// stop if this joint is ejoint
+	connectAttr -f ($condNode + ".outColorR") ($thisJoint + ".scaleX");  // connect condition to joints
+  }  // end for
+
+  return 1;	// successful return
+
+
+}  // end proc setIKSSProc_RT
+

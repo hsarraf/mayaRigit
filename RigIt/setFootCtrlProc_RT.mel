@@ -1,0 +1,72 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//setFootCtrlProc_RT.mel/////
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+source "helperProcs.mel";
+
+if (`window -exists   setFootCtrlWin_RT`)
+deleteUI setFootCtrlWin_RT;
+window -t "Set Foot Control"	setFootCtrlWin_RT;
+columnLayout -adj 1;
+
+  floatFieldGrp -l "Leg Deviation" -adj 1 -cal 1 left    legDeviationFF_RT;
+  button -l "Set" -c		"setFootCtrlProc_RT( \"\", \"\", \"\", \"\", 0.0 )";
+
+
+showWindow   setFootCtrlWin_RT;
+
+
+/* for reusability this proc takes args */
+global proc int 	setFootCtrlProc_RT (string $hip, string $ankle, string $heel, string $toe, float $deviation) {
+
+  if ($hip == "") {		// check if its used by UI or proc
+	string $jList[] = `ls -sl -typ joint`;
+	if (size( $jList) != 4)
+	  error "Four joints must be selected !!";
+	$hip = $jList[0];
+	$ankle = $jList[1];
+	$heel = $jList[2];
+	$toe = $jList[3];
+//	float $rot[3] = `xform -q -ws -ro $heel`;
+	$deviation = `floatFieldGrp -q -value1	legDeviationFF_RT`;
+  } // end if
+
+  string $LR = getPart_x_str( $hip, 1 );
+
+  string $ankleIK[] = `ikHandle -sj $hip -ee $ankle -sol "ikRPsolver" 
+							-n ($LR + "_ankle_IK")`; // set the ankle IK
+  string $heelIK[] = `ikHandle -sj $ankle -ee $heel -sol "ikRPsolver" 
+							-n ($LR + "_heel_IK")`; // set the heel IK
+  string $toeIK[] = `ikHandle -sj $heel -ee $toe -sol "ikRPsolver" 
+							-n ($LR + "_toe_IK")`; // set toe leg IK
+
+  string $ankleRot = `group -em -n ($LR + "_ankle_Rot")`;
+  string $ankleGrp = `group -n ($LR + "_ankleRot_Grp") $ankleRot`;
+  rotate -r 0 $deviation 0;
+  setPos2This( $heel );	// set the group on heel joint
+
+  string $toeRot = `group -em -n ($LR + "_toe_Rot")`;
+  string $toeGrp = `group -n ($LR + "_toeRot_Grp") $toeRot`;
+  rotate -r 0 $deviation 0;
+  setPos2This( $heel );	// set the group on heel joint
+
+  string $heelRot = `group -em -n ($LR + "_heel_Rot")`;
+  string $heelGrp = `group -n ($LR + "_heelRot_Grp") $heelRot`;
+  rotate -r 0 $deviation 0;
+  setPos2This( $toe );	// set the group on toe joint
+
+// parent the the related grps to the related iks
+  parent $ankleIK[0]			$ankleRot;
+  parent $heelIK[0]			$ankleRot;
+  parent $toeIK[0]	   		$toeRot;
+  parent $ankleGrp $toeGrp		$heelRot;    
+
+  select -cl;
+
+  return 1;	// successful return
+} // end proc setFootCtrlProc_RT
+
+

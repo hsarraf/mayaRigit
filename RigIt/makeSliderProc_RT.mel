@@ -1,0 +1,289 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//makeSliderProc_RT.mel//////
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+source "helperProcs.mel";
+
+
+//if (`window -exists makeSlidersWin_RT`)
+  //deleteUI makeSlidersWin_RT;
+//window -t "Make Sliders" 	makeSlidersWin_RT;
+
+//columnLayout -adj 1;
+
+  radioButtonGrp -nrb 2 -l "Type" -la2 "1D" "2D"
+							-select 1 -adj 1 -cal 1 left
+								sliderTypeRB_RT;
+  radioButtonGrp -nrb 2 -l "Mode" -la2 "Corner" "Center"
+							-select 2 -adj 1 -cal 1 left
+								sliderModeRB_RT;
+
+
+  textFieldGrp -l "Base Name" 	baseSliderNameTF_RT;
+  button -l "Make Slider" -c "print (makeSliderProc_RT( \"\", 0, 0 ))";
+
+
+//showWindow makeSlidersWin_RT;
+
+
+global proc string[]		addChannels2SliderProc_RT (string $tweaker, string $mode) {
+
+  switch ($mode) {
+
+    case "2d":	// slider set to 2D center
+	// make the up tweaking channel
+	string $condU = `createNode condition`;		// create a condition node fot up tweaking
+	connectAttr -f ($tweaker + ".ty") ($condU + ".firstTerm");
+	connectAttr -f ($tweaker + ".ty") ($condU + ".colorIfTrueR");
+	setAttr ($condU + ".operation") 3;	// set the condition node to greater or equal
+	setAttr ($condU + ".colorIfFalseR") 0.0;
+	// Make the last multDiv node to connect to the mult attribute
+	string $MultDivU = `createNode multiplyDivide`;
+	connectAttr -f ($condU + ".outColorR") ($MultDivU + ".input1X");
+	connectAttr -f ($tweaker + ".multU") ($MultDivU + ".input2X");
+
+ 	// make the down tweaking channel
+ 	string $condD = `createNode condition`;		// create a condition node fot down tweaking
+ 	connectAttr -f ($tweaker + ".ty") ($condD + ".firstTerm");
+	connectAttr -f ($tweaker + ".ty") ($condD + ".colorIfTrueR");
+	setAttr ($condD + ".operation") 4;	// set the condition node to less than
+	setAttr ($condD + ".colorIfFalseR") 0.0;
+	//  reverse the value of the tweaker
+	string $multDivD = `createNode multiplyDivide`;	// create multDiv node to reverse the value of the tweaker
+	connectAttr -f ($condD + ".outColorR") ($multDivD + ".input1X");
+	setAttr ($multDivD + ".input2X") -1.0;
+	// Make the last multDiv node to connect to the mult attribute
+	string $MultDivD = `createNode multiplyDivide`;
+	connectAttr -f ($multDivD + ".outputX") ($MultDivD + ".input1X");
+	connectAttr -f ($tweaker + ".multD") ($MultDivD + ".input2X");
+
+
+    /*fall through*/
+    case "1d":	// slider set to 1D center
+	// make the right tweaking channel
+	string $condR = `createNode condition`;		// create a condition node fot right tweaking
+	connectAttr -f ($tweaker + ".tx") ($condR + ".firstTerm");
+	connectAttr -f ($tweaker + ".tx") ($condR + ".colorIfTrueR");
+	setAttr ($condR + ".operation") 3;	// set the condition node to greater or equal
+	setAttr ($condR + ".colorIfFalseR") 0.0;
+	// Make the last multDiv node to connect to the mult attribute
+	string $MultDivR = `createNode multiplyDivide`;
+	connectAttr -f ($condR + ".outColorR") ($MultDivR + ".input1X");
+	connectAttr -f ($tweaker + ".multR") ($MultDivR + ".input2X");
+
+ 	// make the left tweaking channel
+ 	string $condL = `createNode condition`;		// create a condition node fot left tweaking
+ 	connectAttr -f ($tweaker + ".tx") ($condL + ".firstTerm");
+	connectAttr -f ($tweaker + ".tx") ($condL + ".colorIfTrueR");
+	setAttr ($condL + ".operation") 4;	// set the condition node to less than
+	setAttr ($condL + ".colorIfFalseR") 0.0;
+	//  reverse the value of the tweaker
+	string $multDivL = `createNode multiplyDivide`;	// create multDiv node to reverse the value of the tweaker
+	connectAttr -f ($condL + ".outColorR") ($multDivL + ".input1X");
+	setAttr ($multDivL + ".input2X") -1.0;
+	// Make the last multDiv node to connect to the mult attribute
+	string $MultDivL = `createNode multiplyDivide`;
+	connectAttr -f ($multDivL + ".outputX") ($MultDivL + ".input1X");
+	connectAttr -f ($tweaker + ".multL") ($MultDivL + ".input2X");
+
+  } // end switch
+
+  if ($mode == "1d")
+ 	return {	($MultDivR + ".outputX"), 
+		 	($MultDivL + ".outputX")	};	// return two channels: right, left
+  else if ($mode == "2d")
+ 	return {	($MultDivR + ".outputX"), 
+		 	($MultDivL + ".outputX"), 
+			($MultDivU + ".outputX"), 
+			($MultDivD + ".outputX")	};	// return four channels: right, left, up, down
+
+  return {};	// return nothing
+
+}	// end proc addChannels2SliderProc_RT
+
+
+
+
+/* for reusability this prco uses args */
+global proc string[]	  makeSliderProc_RT (string $baseName, int $type, int $mode) {
+
+  string $baseSliderName;
+  int $sliderTyp;
+  int $sliderMod;
+
+  if ($baseName == "") {	// when there is no arg, use UI
+	$baseSliderName = `textFieldGrp -q -text  baseSliderNameTF_RT`;
+	$sliderTyp = `radioButtonGrp -q -select sliderTypeRB_RT`;
+	$sliderMod = `radioButtonGrp -q -select sliderModeRB_RT`;
+  }
+
+  else {			// when there are args, use them
+	$baseSliderName = $baseName;
+	$sliderTyp = $type;
+	$sliderMod = $mode;
+  }	
+
+  string $tweakerName, $rectName, $sliderGrpName;
+  string $sliderGrp, $rect, $tweaker[];
+
+  float $len;	// the length of the slider side
+
+  switch ($sliderTyp) {
+
+    case 1:	// set to 1D slider
+	  $rectName = $baseSliderName + "Sldr1D_rect";
+	  $tweakerName = $baseSliderName + "Sldr1D_tweak";
+	  $sliderGrpName = $baseSliderName + "Sldr1D_Grp";
+	  switch ($sliderMod) {
+	    case 1:	// set to corner
+		  $len = 0.5;
+		  $rect = `curve -d 1  -p (-$len) ($len * 0.1) 0 
+					-p ($len) ($len * 0.1) 0 
+					-p ($len) (-$len * 0.1) 0 
+					-p (-$len) (-$len * 0.1) 0 
+					-p (-$len) ($len * 0.1) 0 
+					-k 0 -k 1 -k 2 -k 3 -k 4	-n $rectName`;	// the rectangle region of the slider
+		  $tweaker = `circle -ch off -o on -nr 0 0 1 -r 0.05 	-n $tweakerName`;	// the tweaker of the slider
+		  addAttr -ln "multR"  -at double  $tweaker[0];	// Add a mult attribute to the tweaker
+		  setAttr -e-keyable true ($tweaker[0] + ".multR");	// set the keyable mult attribute to true
+		  setAttr ($tweaker[0] + ".multR") 1.0;	// set the mult valiue to 1.0
+		  move -r -0.5 0 0;
+		  makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $tweaker; // freeze the tweaker
+		  transformLimits -tx 0 1 -etx 1 1 $tweaker;	// limite the tweaket between -1 and 1
+		  $sliderGrp = `group -n 	$sliderGrpName $rect $tweaker[0]`;	// group the tweaker and rectangle
+		  setAttr -lock true ($tweaker[0] + ".ty");
+		  setAttr -lock true ($tweaker[0] + ".tz");
+		  break;
+
+	    case 2:	// set to center
+		  $len = 1.0;
+		  $rect = `curve -d 1  -p (-$len) ($len * 0.1) 0 
+					-p ($len) ($len * 0.1) 0 
+					-p ($len) (-$len * 0.1) 0 
+					-p (-$len) (-$len * 0.1) 0 
+					-p (-$len) ($len * 0.1) 0 
+					-k 0 -k 1 -k 2 -k 3 -k 4	-n $rectName`;	// the rectangle region of the slider
+		  $tweaker = `circle -ch off -o on -nr 0 0 1 -r 0.1 	-n $tweakerName`;	// the tweaker of the slider
+		  addAttr -ln "multR"  -at double  $tweaker[0];	// Add a mult attribute to the tweaker
+		  addAttr -ln "multL"  -at double  $tweaker[0];	// Add a mult attribute to the tweaker
+		  setAttr -e-keyable true ($tweaker[0] + ".multR");	// set the keyable mult attribute to true
+		  setAttr ($tweaker[0] + ".multR") 1.0;	// set the mult valiue to 1.0
+		  setAttr -e-keyable true ($tweaker[0] + ".multL");	// set the keyable mult attribute to true
+		  setAttr ($tweaker[0] + ".multL") 1.0;	// set the mult valiue to 1.0
+		  transformLimits -tx -1 1 -etx 1 1 $tweaker;	// limite the tweaket between -1 and 1
+		  $sliderGrp = `group -n 	$sliderGrpName $rect $tweaker[0]`;	// group the tweaker and rectangle
+		  setAttr -lock true ($tweaker[0] + ".ty");
+		  setAttr -lock true ($tweaker[0] + ".tz");
+		  break;
+
+	  } // end inner switch
+  		  
+	  break;
+
+
+
+    case 2:	// set to 2D slider
+	$rectName = $baseSliderName + "Sldr2D_rect";
+	$tweakerName = $baseSliderName + "Sldr2D_tweak";
+	$sliderGrpName = $baseSliderName + "Sldr2D_Grp";
+	  switch ($sliderMod) {
+	    case 1:	// set to corner
+		  $len = 0.5;
+		  $rect = `curve -d 1  -p (-$len) ($len) 0 
+				-p ($len) ($len) 0 
+				-p ($len) (-$len) 0 
+				-p (-$len) (-$len) 0 
+				-p (-$len) ($len) 0 
+				-k 0 -k 1 -k 2 -k 3 -k 4 	-n $rectName`;	// the rectangle region of the slider
+		  $tweaker = `circle -ch off -o on -nr 0 0 1 -r 0.05 	-n $tweakerName`;	// the tweaker of the slider
+		  addAttr -ln "multR"  -at double  $tweaker[0];	// Add a mult attribute to the tweaker
+		  addAttr -ln "multU"  -at double  $tweaker[0];	// Add a mult attribute to the tweaker
+		  setAttr -e-keyable true ($tweaker[0] + ".multR");	// set the keyable mult attribute to true
+		  setAttr ($tweaker[0] + ".multR") 1.0;	// set the mult valiue to 1.0
+		  setAttr -e-keyable true ($tweaker[0] + ".multU");	// set the keyable mult attribute to true
+		  setAttr ($tweaker[0] + ".multU") 1.0;	// set the mult valiue to 1.0
+		  move -r -0.5 -0.5 0;
+		  makeIdentity -apply true -t 1 -r 1 -s 1 -n 0 $tweaker; // freeze the tweaker
+		  transformLimits -tx 0 1 -etx 1 1 $tweaker;	// limite the tweaket between -1 and 1
+		  transformLimits -ty 0 1 -ety 1 1 $tweaker;	// limite the tweaket between -1 and 1
+		  setAttr -lock true ($tweaker[0] + ".tz");
+		  $sliderGrp = `group  -n 	$sliderGrpName $rect $tweaker[0]`;	// group the tweaker and rectangle
+		  setAttr -lock true ($tweaker[0] + ".tz");
+		  break;
+
+	    case 2:	// set to center
+		  $len = 1;
+		  $rect = `curve -d 1  -p (-$len) ($len) 0 
+				-p ($len) ($len) 0 
+				-p ($len) (-$len) 0 
+				-p (-$len) (-$len) 0 
+				-p (-$len) ($len) 0 
+				-k 0 -k 1 -k 2 -k 3 -k 4 	-n $rectName`;	// the rectangle region of the slider
+		  $tweaker = `circle -ch off -o on -nr 0 0 1 -r 0.1 	-n $tweakerName`;	// the tweaker of the slider
+		  addAttr -ln "multR"  -at double  $tweaker[0];	// Add a mult attribute to the tweaker
+		  addAttr -ln "multL"  -at double  $tweaker[0];	// Add a mult attribute to the tweaker
+		  addAttr -ln "multU"  -at double  $tweaker[0];	// Add a mult attribute to the tweaker
+		  addAttr -ln "multD"  -at double  $tweaker[0];	// Add a mult attribute to the tweaker
+		  setAttr -e-keyable true ($tweaker[0] + ".multR");	// set the keyable mult attribute to true
+		  setAttr ($tweaker[0] + ".multR") 1.0;	// set the mult valiue to 1.0
+		  setAttr -e-keyable true ($tweaker[0] + ".multL");	// set the keyable mult attribute to true
+		  setAttr ($tweaker[0] + ".multL") 1.0;	// set the mult valiue to 1.0
+		  setAttr -e-keyable true ($tweaker[0] + ".multU");	// set the keyable mult attribute to true
+		  setAttr ($tweaker[0] + ".multU") 1.0;	// set the mult valiue to 1.0
+		  setAttr -e-keyable true ($tweaker[0] + ".multD");	// set the keyable mult attribute to true
+		  setAttr ($tweaker[0] + ".multD") 1.0;	// set the mult valiue to 1.0
+		  transformLimits -tx -1 1 -etx 1 1 $tweaker;	// limite the tweaket between -1 and 1
+		  transformLimits -ty -1 1 -ety 1 1 $tweaker;	// limite the tweaket between -1 and 1
+		  $sliderGrp = `group  -n 	$sliderGrpName $rect $tweaker[0]`;	// group the tweaker and rectangle
+		  setAttr -lock true ($tweaker[0] + ".tz");
+		  break;
+
+	  }	// end inner switch
+
+    break;
+
+  } // end outer switch
+
+  setAttr ($rect + ".template") 1;		// the rectangle cant be selected
+
+  if ( ($sliderTyp == 1) && ($sliderMod == 1) ) {
+	// Make the last multDiv node to connect to the mult attribute
+	string $MultDiv = `createNode multiplyDivide`;
+	connectAttr -f ($tweaker[0] + ".tx") ($MultDiv + ".input1X");
+	connectAttr -f ($tweaker[0] + ".multR") ($MultDiv + ".input2X");
+	string $outChannel = ($MultDiv + ".outputX");
+	select -r 	$sliderGrp;	// select the sliderGrp
+	return {$tweaker[0], $outChannel};		// return the tweaker and one channel: right
+  }
+  else if ( ($sliderTyp == 1) && ($sliderMod == 2) ) {
+	string $outChannels[2] = addChannels2SliderProc_RT( $tweaker[0], "1d" );
+	select -r 	$sliderGrp;	// select the sliderGrp
+	return {$tweaker[0], $outChannels[0], $outChannels[1]};	// return the tweaker and two channels: right/left
+  }
+  if ( ($sliderTyp == 2) && ($sliderMod == 1) ) {
+	// Make the last multDiv node to connect to the mult attribute
+	string $MultDivR = `createNode multiplyDivide`;
+	connectAttr -f ($tweaker[0] + ".tx") ($MultDivR + ".input1X");
+	connectAttr -f ($tweaker[0] + ".multR") ($MultDivR + ".input2X");
+	// Make the last multDiv node to connect to the mult attribute
+	string $MultDivU = `createNode multiplyDivide`;
+	connectAttr -f ($tweaker[0] + ".ty") ($MultDivU + ".input1X");
+	connectAttr -f ($tweaker[0] + ".multU") ($MultDivU + ".input2X");
+	string $outChannels[2] = {($MultDivR + ".outputX"), ($MultDivU + ".outputX")};
+	select -r 	$sliderGrp;	// select the sliderGrp
+	return {$tweaker[0], $outChannels[0], $outChannels[1]};	// return the tweaker and two channels: right/up
+  }
+  else if ( ($sliderTyp == 2) && ($sliderMod == 2) ) {
+	string $outChannels[4] = addChannels2SliderProc_RT( $tweaker[0], "2d" );
+	select -r 	$sliderGrp;	// select the sliderGrp
+	return {$tweaker[0], $outChannels[0], $outChannels[1], $outChannels[2], $outChannels[3]};		// return the tweaker and four channels: right/left/up/down
+  }
+
+  return {$tweaker[0]};	// return just the tweaker
+
+}	// end proc makeSliderProc_RT
+
+

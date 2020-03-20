@@ -1,0 +1,47 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//setCluster4CVProc_RT.mel///
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+source "helperProcs.mel";
+
+if (`window -exists   setCluster4CVWin_RT`)
+  deleteUI 	setCluster4CVWin_RT;
+window -t "Set BlendShape"	   setCluster4CVWin_RT;
+columnLayout -adj 1;
+
+  text -l "Select the curve to set cluster for its CVs";
+  button -l "Set Cluster For CV" -c "setCluster4CVProc_RT( \"\" )";
+
+showWindow setCluster4CVWin_RT;
+
+global proc int 	setCluster4CVProc_RT (string $curve) {
+
+  if ($curve == "") {   // check if it is called from GUI
+	string $selectionList[] = `ls -sl -typ transform`;
+	if (size( $selectionList ) != 1) {	// check the number of selection
+	  warning "Wrong selection !!";
+	  return 0;	// failure return
+  } // end inner if
+	$curve = $selectionList[0];
+  } // end outer if
+
+/*  (number of EPs) = (number of spans) + (degree)  */
+  int $spans = `getAttr ($curve + ".spans")`;
+  int $degree = `getAttr ($curve + ".degree")`;
+  int $EPsNum = $spans + $degree;
+
+  string $baseName = getPart_x_str( $curve, 1 ) + "_" + getPart_x_str( $curve, 2 ); // get the base name
+
+  int $i;
+  for ($i = 0 ; $i < $EPsNum ; $i++) 	// iterate on the cvs
+	cluster  -n	($baseName + ($i + 1) + "_Clu") ($curve + ".cv[" + $i + "]");  // set cluster for each cv
+
+
+  select -cl;
+
+  return 1; // successful return
+
+} // end proc setCluster4CVProc_RT

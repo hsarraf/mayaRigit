@@ -1,0 +1,36 @@
+/////////////////////////////
+//RigIt1.0///////////////////
+//RigIt.mel//////////////////
+//Author	Hadi Sarraf//////
+/////////////////////////////
+
+
+source "helperProcs.mel";
+
+
+global proc   RigIt() {
+
+
+if (`window -exists   mainWindow_RT`)
+deleteUI  mainWindow_RT;
+window -t "Rig Tools"   mainWindow_RT;
+columnLayout -adj 1;
+
+  button -l "Joint Manipulator" -h 17 -bgc 1 1 0	-c "source \"jointManipProc_RT.mel\"";
+  button -l "Fast Tools" -h 17 -bgc 0 1 1	-c "source \"fastTools_RT.mel\"";
+  button -l "Set Name" -h 17 -bgc .85 .85 .85	-c "source \"setNameProc_RT.mel\"";
+  button -l "Make Proxy for Skeleton" -h 17 -bgc 1 .5 0	-c "source \"makeProxy4skeletonProc_RT.mel\"";
+  button -l "Set Cluster For CV" -h 17 -bgc 0 .6 .6	-c "source \"setCluster4CVProc_RT.mel\"";
+  button -l "Set Slider For Attribute" -h 17 -bgc 0 1 0	-c "source \"setSlider4AttributeProc_RT.mel\"";
+  button -l "Make Slider" -h 17 -bgc 0 1 0	-c "source \"makeSliderProc_RT.mel\"";
+  button -l "Set Foot Control" -h 17 -bgc .2 .8 1		-c "source \"setFootCtrlProc_RT.mel\"";
+  button -l "Set Handler To Joint" -h 17	 -bgc .2 .8 1	-c "source \"setHandler2JointProc_RT.mel\"";
+  button -l "Set IK SS" -h 17 -bgc .2 .8 1		-c "source \"setIKSSProc_RT.mel\"";
+  button -l "Set Spine SS" -h 17	-bgc .2 .8 1	-c"source \"setSpineSSProc_RT.mel\"";
+  button -l "Set BlendShape" -h 17 -bgc 1 .2 0	-c "source \"setBlendShapeProc_RT.mel\"";
+  button -l "Set Muscle Jiggle" -h 17 -bgc 1 .4 .1	-c "source \"setMuscleJiggleProc_RT.mel\"";
+
+showWindow  mainWindow_RT;
+
+
+}
